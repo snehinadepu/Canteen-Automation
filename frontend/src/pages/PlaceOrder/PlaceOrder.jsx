@@ -1,65 +1,112 @@
-import React, { useContext, useEffect, useState } from 'react'
-import './PlaceOrder.css'
-import { StoreContext } from '../../context/StoreContext'
-import axios from 'axios'
-import { useNavigate } from 'react-router-dom'
+import React, { useContext, useState, useEffect } from 'react';
+import './PlaceOrder.css';
+import { StoreContext } from '../../context/StoreContext';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const PlaceOrder = () => {
+  const navigate = useNavigate();
+  const { getTotalCartAmount, token, food_list, cartItems, url } = useContext(StoreContext);
 
-  const navigate= useNavigate();
+  const [data, setData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    rollNumber: "",
+    year: "",
+    department: "",
+    section: "",
+    phoneNumber: "",
+  });
 
+  const loadRazorpay = async (orderDetails) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
 
-  const { getTotalCartAmount , token , food_list , cartItems , url } = useContext(StoreContext)
+    script.onload = () => {
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderDetails.amount,
+        currency: orderDetails.currency,
+        name: "Your App",
+        order_id: orderDetails.razorpayOrderId,
+        handler: function (response) {
+          // ✅ Redirect to /verify page with query parameters
+          navigate(`/verify?success=true&orderId=${orderDetails.orderId}`);
+        },
+        prefill: {
+          name: data.firstName + " " + data.lastName,
+          email: data.email,
+          contact: data.phoneNumber,
+        },
+        theme: {
+          color: "#528FF0",
+        },
+      };
 
-  const [data,setData] = useState({
-    firstName:"",
-    lastName:"",
-    email:"",
-    rollNumber:"",
-    year:"",
-    department:"",
-    section:"",
-    phoneNumber:""
-  })
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    };
+
+    script.onerror = () => {
+      alert("Razorpay SDK failed to load. Are you online?");
+    };
+
+    document.body.appendChild(script);
+  };
 
   const placeOrder = async (e) => {
-    e.preventDefault()
-    let orderItems = []
-    food_list.map((item)=>{
-      if(cartItems[item._id]>0){
-        let itemInfo = item
-        itemInfo["quantity"] = cartItems[item._id]
-        orderItems.push(itemInfo)
+    e.preventDefault();
+
+    if (!token) {
+      alert("You need to be logged in to place an order.");
+      navigate("/login");
+      return;
+    }
+
+    let orderItems = [];
+    food_list.forEach((item) => {
+      if (cartItems[item._id] > 0) {
+        let itemInfo = { ...item };
+        itemInfo["quantity"] = cartItems[item._id];
+        orderItems.push(itemInfo);
       }
-    })
-    let orderData = {
-      address:data,
-      items:orderItems,
-      amount:getTotalCartAmount()+50
+    });
+
+    const orderData = {
+      items: orderItems,
+      amount: getTotalCartAmount() + 50, // Application fee
+      class: data,
+    };
+
+    try {
+      const response = await axios.post(`${url}/api/order/place`, orderData, {
+        headers: { token },
+      });
+
+      if (response.data.success) {
+        loadRazorpay(response.data);
+      } else {
+        console.error("Order creation failed", response.data);
+        alert("Order creation failed");
+      }
+    } catch (error) {
+      console.error("Place order error:", error.response?.data || error.message);
+      alert("An error occurred while placing the order.");
     }
-    let response = await axios.post(url+"/api/order/place",orderData,{headers:{token}})
-    if(response.data.success){
-      const {session_url} = response.data
-      window.location.replace(session_url)
-    }
-    else{
-      alert("Error")
-    }
-  }
+  };
 
   const onChangeHandler = (e) => {
-    const name = e.target.name
-    const value = e.target.value
-    setData(data=>({...data,[name]:value}))
-  }
+    const name = e.target.name;
+    const value = e.target.value;
+    setData((prev) => ({ ...prev, [name]: value }));
+  };
 
-  useEffect(()=>{
-    if(!token){
-      navigate('/cart')
-    }else if(getTotalCartAmount===0){
-      navigate('/cart')
+  useEffect(() => {
+    if (!token || getTotalCartAmount() === 0) {
+      navigate('/cart');
     }
-  },[token])
+  }, [token]);
 
   return (
     <form onSubmit={placeOrder} className='place-order'>
@@ -80,6 +127,7 @@ const PlaceOrder = () => {
           <input required name='phoneNumber' onChange={onChangeHandler} value={data.phoneNumber} type="text" placeholder='Phone Number' />
         </div>
       </div>
+
       <div className="place-order-right">
         <div className="cart-total">
           <h2>Cart Total</h2>
@@ -103,7 +151,7 @@ const PlaceOrder = () => {
         </div>
       </div>
     </form>
-  )
-}
+  );
+};
 
-export default PlaceOrder
+export default PlaceOrder;
