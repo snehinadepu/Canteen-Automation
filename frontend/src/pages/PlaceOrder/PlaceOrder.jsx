@@ -9,14 +9,8 @@ const PlaceOrder = () => {
   const { getTotalCartAmount, token, food_list, cartItems, url } = useContext(StoreContext);
 
   const [data, setData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    rollNumber: "",
-    year: "",
-    department: "",
-    section: "",
-    phoneNumber: "",
+    firstName: "", lastName: "", email: "", rollNumber: "", year: "",
+    department: "", section: "", phoneNumber: "",
   });
 
   const loadRazorpay = async (orderDetails) => {
@@ -31,24 +25,12 @@ const PlaceOrder = () => {
         name: "Your App",
         order_id: orderDetails.razorpayOrderId,
         handler: async function (response) {
-          try {
-            // Call the verify endpoint with tempOrderData
-            await axios.post(`${url}/api/order/verify`, {
-              razorpayOrderId: orderDetails.razorpayOrderId,
-              success: "true",
-              tempOrderData: orderDetails.tempOrderData
-            }, {
-              headers: { token }
-            });
+          localStorage.setItem("tempOrderData", JSON.stringify(orderDetails.tempOrderData));
 
-            navigate("/verify?success=true");
-          } catch (err) {
-            console.error("Verification failed", err);
-            navigate("/verify?success=false");
-          }
+          navigate(`/verify?success=true&razorpayOrderId=${response.razorpay_order_id}&razorpayPaymentId=${response.razorpay_payment_id}&razorpaySignature=${response.razorpay_signature}`);
         },
         prefill: {
-          name: data.firstName + " " + data.lastName,
+          name: `${data.firstName} ${data.lastName}`,
           email: data.email,
           contact: data.phoneNumber,
         },
@@ -72,7 +54,7 @@ const PlaceOrder = () => {
     e.preventDefault();
 
     if (!token) {
-      alert("You need to be logged in to place an order.");
+      alert("Please login to continue");
       navigate("/login");
       return;
     }
@@ -80,9 +62,7 @@ const PlaceOrder = () => {
     let orderItems = [];
     food_list.forEach((item) => {
       if (cartItems[item._id] > 0) {
-        let itemInfo = { ...item };
-        itemInfo["quantity"] = cartItems[item._id];
-        orderItems.push(itemInfo);
+        orderItems.push({ ...item, quantity: cartItems[item._id] });
       }
     });
 
@@ -93,28 +73,24 @@ const PlaceOrder = () => {
     };
 
     try {
-      const response = await axios.post(`${url}/api/order/place`, orderData, {
+      const res = await axios.post(`${url}/api/order/place`, orderData, {
         headers: { token },
       });
 
-      if (response.data.success) {
-        // Attach tempOrderData to be used in /verify
-        response.data.tempOrderData = orderData;
-        loadRazorpay(response.data);
+      if (res.data.success) {
+        res.data.tempOrderData = orderData;
+        loadRazorpay(res.data);
       } else {
-        console.error("Order creation failed", response.data);
         alert("Order creation failed");
       }
-    } catch (error) {
-      console.error("Place order error:", error.response?.data || error.message);
-      alert("An error occurred while placing the order.");
+    } catch (err) {
+      console.error("Place order error:", err);
+      alert("Error placing order");
     }
   };
 
   const onChangeHandler = (e) => {
-    const name = e.target.name;
-    const value = e.target.value;
-    setData((prev) => ({ ...prev, [name]: value }));
+    setData({ ...data, [e.target.name]: e.target.value });
   };
 
   useEffect(() => {
@@ -128,40 +104,29 @@ const PlaceOrder = () => {
       <div className="place-order-left">
         <p className='title'>Order Info</p>
         <div className="multi-fields">
-          <input required name='firstName' onChange={onChangeHandler} value={data.firstName} type="text" placeholder='First Name' />
-          <input required name='lastName' onChange={onChangeHandler} value={data.lastName} type="text" placeholder='Last Name' />
+          <input required name='firstName' value={data.firstName} onChange={onChangeHandler} placeholder='First Name' />
+          <input required name='lastName' value={data.lastName} onChange={onChangeHandler} placeholder='Last Name' />
         </div>
-        <input required name='email' onChange={onChangeHandler} value={data.email} type="email" placeholder='Email' />
-        <input required name='rollNumber' onChange={onChangeHandler} value={data.rollNumber} type="text" placeholder='Roll Number' />
+        <input required name='email' value={data.email} onChange={onChangeHandler} type='email' placeholder='Email' />
+        <input required name='rollNumber' value={data.rollNumber} onChange={onChangeHandler} placeholder='Roll Number' />
         <div className="multi-fields">
-          <input required name='year' onChange={onChangeHandler} value={data.year} type="text" placeholder='Year' />
-          <input required name='department' onChange={onChangeHandler} value={data.department} type="text" placeholder='Department' />
+          <input required name='year' value={data.year} onChange={onChangeHandler} placeholder='Year' />
+          <input required name='department' value={data.department} onChange={onChangeHandler} placeholder='Department' />
         </div>
         <div className="multi-fields">
-          <input required name='section' onChange={onChangeHandler} value={data.section} type="text" placeholder='Section' />
-          <input required name='phoneNumber' onChange={onChangeHandler} value={data.phoneNumber} type="text" placeholder='Phone Number' />
+          <input required name='section' value={data.section} onChange={onChangeHandler} placeholder='Section' />
+          <input required name='phoneNumber' value={data.phoneNumber} onChange={onChangeHandler} placeholder='Phone Number' />
         </div>
       </div>
 
       <div className="place-order-right">
         <div className="cart-total">
           <h2>Cart Total</h2>
-          <div>
-            <div className="cart-total-details">
-              <p>Sub Total</p>
-              <p>₹{getTotalCartAmount()}</p>
-            </div>
-            <hr />
-            <div className="cart-total-details">
-              <p>Application Fee</p>
-              <p>₹{getTotalCartAmount() === 0 ? 0 : 50}</p>
-            </div>
-            <hr />
-            <div className="cart-total-details">
-              <b>Total</b>
-              <b>₹{getTotalCartAmount() === 0 ? 0 : getTotalCartAmount() + 50}</b>
-            </div>
-          </div>
+          <div className="cart-total-details"><p>Sub Total</p><p>₹{getTotalCartAmount()}</p></div>
+          <hr />
+          <div className="cart-total-details"><p>Application Fee</p><p>₹{getTotalCartAmount() === 0 ? 0 : 50}</p></div>
+          <hr />
+          <div className="cart-total-details"><b>Total</b><b>₹{getTotalCartAmount() + 50}</b></div>
           <button type='submit'>PROCEED TO PAY</button>
         </div>
       </div>
