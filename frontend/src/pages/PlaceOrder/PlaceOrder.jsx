@@ -30,9 +30,22 @@ const PlaceOrder = () => {
         currency: orderDetails.currency,
         name: "Your App",
         order_id: orderDetails.razorpayOrderId,
-        handler: function (response) {
-          // ✅ Redirect to /verify page with query parameters
-          navigate(`/verify?success=true&orderId=${orderDetails.orderId}`);
+        handler: async function (response) {
+          try {
+            // Call the verify endpoint with tempOrderData
+            await axios.post(`${url}/api/order/verify`, {
+              razorpayOrderId: orderDetails.razorpayOrderId,
+              success: "true",
+              tempOrderData: orderDetails.tempOrderData
+            }, {
+              headers: { token }
+            });
+
+            navigate("/verify?success=true");
+          } catch (err) {
+            console.error("Verification failed", err);
+            navigate("/verify?success=false");
+          }
         },
         prefill: {
           name: data.firstName + " " + data.lastName,
@@ -75,7 +88,7 @@ const PlaceOrder = () => {
 
     const orderData = {
       items: orderItems,
-      amount: getTotalCartAmount() + 50, // Application fee
+      amount: getTotalCartAmount(),
       class: data,
     };
 
@@ -85,6 +98,8 @@ const PlaceOrder = () => {
       });
 
       if (response.data.success) {
+        // Attach tempOrderData to be used in /verify
+        response.data.tempOrderData = orderData;
         loadRazorpay(response.data);
       } else {
         console.error("Order creation failed", response.data);

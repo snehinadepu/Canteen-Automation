@@ -2,54 +2,44 @@ import Razorpay from "razorpay";
 import orderModel from "../models/orderModel.js";
 import userModel from "../models/userModel.js";
 
-// Place user order from frontend
+// Step 1: Place Order (Initiate Razorpay Order only)
 const placeOrder = async (req, res) => {
   const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_SECRET,
   });
 
-  const frontend_url = "http://localhost:5173"; // URL for frontend
+
+
+  const frontend_url = "http://localhost:5173";
 
   try {
-    // Ensure user is authenticated
     if (!req.user || !req.user.userId) {
       return res.status(400).json({ success: false, message: "User not authenticated" });
     }
 
-    // Create a new order document in your MongoDB
-    const newOrder = new orderModel({
-      userId: req.user.userId, // Use user._id from authenticated user
-      items: req.body.items,
-      amount: req.body.amount,
-      class: req.body.class,
-    });
-    await newOrder.save();
+    // Calculate total amount (add ₹50 fee) and convert to paise
+    const totalAmount = (req.body.amount + 50) * 100;
 
-    // Clear the user's cart data after placing the order
-    await userModel.findByIdAndUpdate(req.user.userId, { cartData: {} });
-
-    // Calculate total amount (Razorpay accepts the amount in paise)
-    const totalAmount = (req.body.amount + 50) * 100; // Adding application charges (₹50) and converting to paise
-
-    // Prepare Razorpay order options
     const options = {
-      amount: totalAmount, // The total amount in paise (1 INR = 100 paise)
+      amount: totalAmount,
       currency: "INR",
-      receipt: `${newOrder._id}`,
+      receipt: `receipt_order_${Date.now()}`,
     };
 
-    // Create the order on Razorpay
     const razorpayOrder = await razorpay.orders.create(options);
 
-    // Send the order details and redirect URL to the frontend
     res.json({
       success: true,
-      orderId: newOrder._id,
       razorpayOrderId: razorpayOrder.id,
       amount: totalAmount,
       currency: "INR",
-      frontendRedirectUrl: `${frontend_url}/verify?orderId=${newOrder._id}&razorpayOrderId=${razorpayOrder.id}`,
+      tempOrderData: {
+        items: req.body.items,
+        amount: req.body.amount,
+        class: req.body.class,
+      },
+      frontendRedirectUrl: `${frontend_url}/verify?razorpayOrderId=${razorpayOrder.id}`,
     });
 
   } catch (error) {
@@ -61,26 +51,43 @@ const placeOrder = async (req, res) => {
   }
 };
 
-// Verify Razorpay order and update order status
+// Step 2: Verify Razorpay order and ONLY THEN save order to DB
 const verifyOrder = async (req, res) => {
-  const { orderId, razorpayOrderId, success } = req.body;
+  const { razorpayOrderId, success, tempOrderData } = req.body;
+
   try {
-    if (success === "true") {
-      // Mark order as paid
-      await orderModel.findByIdAndUpdate(orderId, { payment: true });
-      res.json({ success: true, message: "Payment Successful" });
-    } else {
-      // Delete the order if payment failed
-      await orderModel.findByIdAndDelete(orderId);
-      res.json({ success: false, message: "Payment Failed" });
+    if (!req.user || !req.user.userId) {
+      return res.status(400).json({ success: false, message: "User not authenticated" });
     }
+
+    if (success === "true") {
+      // Create and save order in DB
+      const newOrder = new orderModel({
+        userId: req.user.userId,
+        items: tempOrderData.items,
+        amount: tempOrderData.amount,
+        class: tempOrderData.class,
+        payment: true,
+      });
+
+      await newOrder.save();
+
+      // Clear user's cart
+      await userModel.findByIdAndUpdate(req.user.userId, { cartData: {} });
+
+      res.json({ success: true, message: "Payment Successful", orderId: newOrder._id });
+    } else {
+      // No order is saved
+      res.json({ success: false, message: "Payment Failed. Order not created." });
+    }
+
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: "Error verifying payment" });
   }
 };
 
-// Fetch orders of the user for the frontend
+// Step 3: Fetch orders for the authenticated user
 const userOrders = async (req, res) => {
   try {
     const orders = await orderModel.find({ userId: req.user.userId });
@@ -91,7 +98,7 @@ const userOrders = async (req, res) => {
   }
 };
 
-// Admin: List all orders
+// Step 4: Admin - list all orders
 const listOrders = async (req, res) => {
   try {
     const orders = await orderModel.find({});
@@ -102,7 +109,7 @@ const listOrders = async (req, res) => {
   }
 };
 
-// Admin: Update order status
+// Step 5: Admin - update order status
 const updateStatus = async (req, res) => {
   const { orderId, status } = req.body;
 

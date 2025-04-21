@@ -69,35 +69,33 @@ const Orders = ({ url, adminToken }) => {
       <div className="order-list">
         {orders.map((order, index) => (
           <div key={index} className="order-item">
-            <img src={assets.parcel_icon} alt="Order" />
-            <div>
-              <p className="order-item-food">
-                {order.items
-                  .map((item) => `${item.name} x ${item.quantity}`)
-                  .join(', ')}
+          <img src={assets.parcel_icon} alt="Order" />
+          <div>
+            <p className="order-item-food">
+              {order.items.map((item) => `${item.name} x ${item.quantity}`).join(', ')}
+            </p>
+            <p className="order-item-name">
+              {order.class?.firstName + " " + order.class?.lastName || "N/A"}
+            </p>
+            <div className="order-item-address">
+              <p>{order.class?.department + ',' || 'N/A'}</p>
+              <p>
+                {order.class?.section + ', ' + order.class?.rollNumber + ', ' + order.class?.year || 'N/A'}
               </p>
-              <p className="order-item-name">
-                {order.address?.firstName + " " + order.address?.lastName || "N/A"} {/* Handle undefined address */}
-              </p>
-              <div className="order-item-address">
-                <p>{order.address?.department + ',' || 'N/A'}</p>
-                <p>
-                  {order.address?.section + ',' + order.address?.rollNumber + ',' + order.address?.year || 'N/A'}
-                </p>
-              </div>
-              <p className="order-item-phone">{order.address?.phoneNumber || 'N/A'}</p>
             </div>
-            <p>Items: {order.items.length}</p>
-            <p>₹{order.amount}</p>
-            <select
-              onChange={(e) => statusHandler(e, order._id)} // Pass the new status to the backend
-              value={order.status}
-            >
-              <option value="Food Processing">Food Processing</option>
-              <option value="Food Given">Food Given</option>
-              {/* Add other status options as needed */}
-            </select>
+            <p className="order-item-phone">{order.class?.phoneNumber || 'N/A'}</p>
           </div>
+          <p>Items: {order.items.length}</p>
+          <p>₹{order.amount}</p>
+          <select
+            onChange={(e) => statusHandler(e, order._id)}
+            value={order.status}
+          >
+            <option value="Food Processing">Food Processing</option>
+            <option value="Food Given">Food Given</option>
+          </select>
+        </div>
+        
         ))}
       </div>
     </div>
