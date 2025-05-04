@@ -9,26 +9,27 @@ const placeOrder = async (req, res) => {
     key_secret: process.env.RAZORPAY_SECRET,
   });
 
-
-
-  const frontend_url = "http://localhost:5173";
+  const frontend_url = "http://localhost:5173"; // Replace with your frontend URL in production
 
   try {
+    // Ensure the user is authenticated
     if (!req.user || !req.user.userId) {
       return res.status(400).json({ success: false, message: "User not authenticated" });
     }
 
-    // Calculate total amount (add ₹50 fee) and convert to paise
+    // Calculate total amount (add ₹50 fee) and convert to paise (1 INR = 100 paise)
     const totalAmount = (req.body.amount + 50) * 100;
 
     const options = {
-      amount: totalAmount,
+      amount: totalAmount, // Amount in paise
       currency: "INR",
       receipt: `receipt_order_${Date.now()}`,
     };
 
+    // Create Razorpay order
     const razorpayOrder = await razorpay.orders.create(options);
 
+    // Respond with Razorpay order details
     res.json({
       success: true,
       razorpayOrderId: razorpayOrder.id,
@@ -37,13 +38,13 @@ const placeOrder = async (req, res) => {
       tempOrderData: {
         items: req.body.items,
         amount: req.body.amount,
-        class: req.body.class,
+        class: req.body.class,  // Store class details with order
       },
       frontendRedirectUrl: `${frontend_url}/verify?razorpayOrderId=${razorpayOrder.id}`,
     });
 
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({
       success: false,
       message: "Error occurred while placing order",
@@ -56,6 +57,7 @@ const verifyOrder = async (req, res) => {
   const { razorpayOrderId, success, tempOrderData } = req.body;
 
   try {
+    // Ensure the user is authenticated
     if (!req.user || !req.user.userId) {
       return res.status(400).json({ success: false, message: "User not authenticated" });
     }
@@ -66,23 +68,23 @@ const verifyOrder = async (req, res) => {
         userId: req.user.userId,
         items: tempOrderData.items,
         amount: tempOrderData.amount,
-        class: tempOrderData.class,
+        class: tempOrderData.class,  // Save class details with the order
         payment: true,
       });
 
       await newOrder.save();
 
-      // Clear user's cart
+      // Clear user's cart data after successful order
       await userModel.findByIdAndUpdate(req.user.userId, { cartData: {} });
 
       res.json({ success: true, message: "Payment Successful", orderId: newOrder._id });
     } else {
-      // No order is saved
+      // Payment failed, order not created
       res.json({ success: false, message: "Payment Failed. Order not created." });
     }
 
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: "Error verifying payment" });
   }
 };
@@ -90,10 +92,11 @@ const verifyOrder = async (req, res) => {
 // Step 3: Fetch orders for the authenticated user
 const userOrders = async (req, res) => {
   try {
+    // Fetch orders for the logged-in user
     const orders = await orderModel.find({ userId: req.user.userId });
     res.json({ success: true, data: orders });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: "Error fetching user orders" });
   }
 };
@@ -101,10 +104,11 @@ const userOrders = async (req, res) => {
 // Step 4: Admin - list all orders
 const listOrders = async (req, res) => {
   try {
+    // Fetch all orders for admin
     const orders = await orderModel.find({});
     res.json({ success: true, data: orders });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: "Error fetching orders" });
   }
 };
@@ -114,6 +118,7 @@ const updateStatus = async (req, res) => {
   const { orderId, status } = req.body;
 
   try {
+    // Find and update order status
     const updatedOrder = await orderModel.findByIdAndUpdate(
       orderId,
       { status },
@@ -126,7 +131,7 @@ const updateStatus = async (req, res) => {
 
     res.json({ success: true, message: "Order status updated", data: updatedOrder });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ success: false, message: "Error updating order status" });
   }
 };

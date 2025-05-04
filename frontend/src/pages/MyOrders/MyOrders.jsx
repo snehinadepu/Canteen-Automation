@@ -7,6 +7,7 @@ import { assets } from "../../assets/assets";
 const MyOrders = () => {
   const { url, token } = useContext(StoreContext);
   const [data, setData] = useState([]);
+  const [intervalId, setIntervalId] = useState(null);
 
   const fetchOrders = async () => {
     const response = await axios.post(
@@ -21,9 +22,23 @@ const MyOrders = () => {
 
   useEffect(() => {
     if (token) {
-      fetchOrders();
+      fetchOrders();  // Initial fetch
+
+      // Automatically fetch orders every 5 seconds
+      const id = setInterval(() => {
+        fetchOrders();
+      }, 5000);
+      setIntervalId(id);
+
+      // Cleanup the interval when the component unmounts
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
     }
   }, [token]);
+
   return (
     <div className="my-orders">
       <h2>Orders</h2>
@@ -41,13 +56,12 @@ const MyOrders = () => {
                   }
                 })}
               </p>
-              <p>₹{order.amount+50}.00</p>
+              <p>₹{order.amount + 50}.00</p>
               <p>items: {order.items.length}</p>
               <p>
                 <span>&#x25cf;</span>
                 <b> {order.status}</b>
               </p>
-              <button onClick={fetchOrders}>Track Order</button>
             </div>
           );
         })}

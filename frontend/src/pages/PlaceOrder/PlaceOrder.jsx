@@ -13,21 +13,48 @@ const PlaceOrder = () => {
     department: "", section: "", phoneNumber: "",
   });
 
+  // Load Razorpay script and initialize payment
   const loadRazorpay = async (orderDetails) => {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
 
     script.onload = () => {
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: orderDetails.amount,
-        currency: orderDetails.currency,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Razorpay key ID
+        amount: orderDetails.amount, // Order amount
+        currency: orderDetails.currency, // Currency (INR)
         name: "Your App",
         order_id: orderDetails.razorpayOrderId,
         handler: async function (response) {
-          localStorage.setItem("tempOrderData", JSON.stringify(orderDetails.tempOrderData));
+          const tempOrderData = orderDetails.tempOrderData;
 
-          navigate(`/verify?success=true&razorpayOrderId=${response.razorpay_order_id}&razorpayPaymentId=${response.razorpay_payment_id}&razorpaySignature=${response.razorpay_signature}`);
+          try {
+            // Verify payment with Razorpay
+            const verifyRes = await axios.post(
+              `${url}/api/order/verify`,
+              {
+                success: "true",
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                tempOrderData, // Pass the complete order data to the backend
+              },
+              {
+                headers: { token },
+              }
+            );
+
+            if (verifyRes.data.success) {
+              alert("Payment successful! Order placed.");
+              localStorage.removeItem("tempOrderData");
+              navigate("/myorders"); // Redirect to orders page
+            } else {
+              alert("Payment verified but order not saved.");
+            }
+          } catch (error) {
+            console.error("Verify error:", error);
+            alert("Error verifying payment and saving order.");
+          }
         },
         prefill: {
           name: `${data.firstName} ${data.lastName}`,
@@ -40,16 +67,17 @@ const PlaceOrder = () => {
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.open();
+      rzp.open(); // Open Razorpay payment modal
     };
 
     script.onerror = () => {
       alert("Razorpay SDK failed to load. Are you online?");
     };
 
-    document.body.appendChild(script);
+    document.body.appendChild(script); // Append the script to the DOM
   };
 
+  // Place order function
   const placeOrder = async (e) => {
     e.preventDefault();
 
@@ -69,7 +97,7 @@ const PlaceOrder = () => {
     const orderData = {
       items: orderItems,
       amount: getTotalCartAmount(),
-      class: data,
+      class: data, // User's details
     };
 
     try {
@@ -78,8 +106,8 @@ const PlaceOrder = () => {
       });
 
       if (res.data.success) {
-        res.data.tempOrderData = orderData;
-        loadRazorpay(res.data);
+        res.data.tempOrderData = orderData; // Pass the order data to Razorpay
+        loadRazorpay(res.data); // Load Razorpay with the order details
       } else {
         alert("Order creation failed");
       }
@@ -89,6 +117,7 @@ const PlaceOrder = () => {
     }
   };
 
+  // Handle input changes for user's data
   const onChangeHandler = (e) => {
     setData({ ...data, [e.target.name]: e.target.value });
   };

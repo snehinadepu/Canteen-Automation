@@ -16,8 +16,10 @@ const Orders = ({ url, adminToken }) => {
         }
       });
       if (response.data.success) {
-        setOrders(response.data.data); // Use `.data` not `.orders`
-        console.log(response.data.data);
+        // Sort orders by creation time (descending order)
+        const sortedOrders = response.data.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setOrders(sortedOrders); // Use the sorted order list
+        console.log(sortedOrders); // Debugging log
       } else {
         toast.error('Error fetching orders');
       }
@@ -47,7 +49,7 @@ const Orders = ({ url, adminToken }) => {
 
       if (response.data.success) {
         toast.success('Order status updated');
-        setOrders(orders.map(order => 
+        setOrders(orders.map(order =>
           order._id === orderId ? { ...order, status: newStatus } : order
         )); // Update the status locally
       } else {
@@ -69,33 +71,33 @@ const Orders = ({ url, adminToken }) => {
       <div className="order-list">
         {orders.map((order, index) => (
           <div key={index} className="order-item">
-          <img src={assets.parcel_icon} alt="Order" />
-          <div>
-            <p className="order-item-food">
-              {order.items.map((item) => `${item.name} x ${item.quantity}`).join(', ')}
-            </p>
-            <p className="order-item-name">
-              {order.class?.firstName + " " + order.class?.lastName || "N/A"}
-            </p>
-            <div className="order-item-address">
-              <p>{order.class?.department + ',' || 'N/A'}</p>
-              <p>
-                {order.class?.section + ', ' + order.class?.rollNumber + ', ' + order.class?.year || 'N/A'}
+            <img src={assets.parcel_icon} alt="Order" />
+            <div>
+              <p className="order-item-food">
+                {order.items.map((item) => `${item.name} x ${item.quantity}`).join(', ')}
               </p>
+              <p className="order-item-name">
+                {order.class?.firstName + " " + order.class?.lastName || "N/A"}
+              </p>
+              <div className="order-item-address">
+                <p>{order.class?.department + ',' || 'N/A'}</p>
+                <p>
+                  {order.class?.section + ', ' + order.class?.rollNumber + ', ' + order.class?.year || 'N/A'}
+                </p>
+              </div>
+              <p className="order-item-phone">{order.class?.phoneNumber || 'N/A'}</p>
             </div>
-            <p className="order-item-phone">{order.class?.phoneNumber || 'N/A'}</p>
+            <p>Items: {order.items.length}</p>
+            <p>₹{order.amount+50}</p>
+            <select
+              onChange={(e) => statusHandler(e, order._id)}
+              value={order.status}
+            >
+              <option value="Order Received">Order Received</option>
+              <option value="Food Processing">Food Processing</option>
+              <option value="Food Given">Food Given</option>
+            </select>
           </div>
-          <p>Items: {order.items.length}</p>
-          <p>₹{order.amount}</p>
-          <select
-            onChange={(e) => statusHandler(e, order._id)}
-            value={order.status}
-          >
-            <option value="Food Processing">Food Processing</option>
-            <option value="Food Given">Food Given</option>
-          </select>
-        </div>
-        
         ))}
       </div>
     </div>
