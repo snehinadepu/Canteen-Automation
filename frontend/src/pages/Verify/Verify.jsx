@@ -26,22 +26,26 @@ const Verify = () => {
 
         if (res.data.success) {
           localStorage.removeItem("tempOrderData");
+          // Navigate to the "my orders" page after successful payment
           navigate("/myorders");
         } else {
+          // If payment verification fails, navigate back to the homepage
           navigate("/");
         }
       } catch (err) {
         console.error("Error verifying payment", err);
+        // In case of an error, navigate to homepage or show error message
         navigate("/");
       }
     };
 
+    // Only try verifying the payment if success is true
     if (success === "true") {
       verifyPayment();
     } else {
-      navigate("/");
+      navigate("/"); // If success is false or undefined, navigate to homepage
     }
-  }, []);
+  }, [razorpay_order_id, razorpay_payment_id, razorpay_signature, success, navigate, tempOrderData]);
 
   return (
     <div className='verify'>
